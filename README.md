@@ -5,13 +5,17 @@ Terminal-based internet speed test built with Python, `httpx`, and `rich`.
 ## Installation
 
 ```bash
-pip install -e .
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e .
 ```
 
 For development:
 
 ```bash
-pip install -e ".[dev]"
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e ".[dev]"
 ```
 
 ## Usage
@@ -56,13 +60,15 @@ python -m speed_test_tui --fake
 
 ```bash
 # Install dev dependencies
-pip install -e ".[dev]"
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e ".[dev]"
 
 # Run tests
-pytest
+python -m pytest
 
 # Run tests with coverage
-pytest --cov=speed_test_tui --cov-report=term-missing
+python -m pytest --cov=speed_test_tui --cov-report=term-missing
 ```
 
 ## License
