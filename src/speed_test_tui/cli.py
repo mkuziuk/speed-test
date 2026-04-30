@@ -30,6 +30,16 @@ PRESETS: dict[str, dict[str, str]] = {
     },
 }
 
+_HELP_TEXT = """\
+Available commands:
+  /run              Run a speed test with current settings
+  /preset <name>    Switch to a preset ({presets})
+  /presets          List available presets
+  /server           Show current server URL
+  /help             Show this help message
+  /quit, /q, /exit  Exit the session
+""".format(presets=", ".join(PRESETS.keys()))
+
 
 def build_parser() -> argparse.ArgumentParser:
     """Build the CLI parser."""
@@ -95,6 +105,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Print final results as JSON instead of the live TUI.",
     )
     parser.add_argument(
+        "--run-once",
+        action="store_true",
+        help="Run one test and exit (default: start interactive session).",
+    )
+    parser.add_argument(
         "--fake",
         action="store_true",
         help="Use deterministic fake results without network calls.",
@@ -105,9 +120,12 @@ def build_parser() -> argparse.ArgumentParser:
 def resolve_args(args: argparse.Namespace) -> None:
     """Apply preset defaults when the user did not provide explicit URLs."""
     preset = PRESETS[args.preset]
-    args.server = args.server or preset["server"]
-    args.download_url = args.download_url or preset["download_url"]
-    args.upload_url = args.upload_url or preset["upload_url"]
+    if not getattr(args, "_explicit_server", False):
+        args.server = preset["server"]
+    if not getattr(args, "_explicit_download", False):
+        args.download_url = preset["download_url"]
+    if not getattr(args, "_explicit_upload", False):
+        args.upload_url = preset["upload_url"]
 
 
 def make_engine(args: argparse.Namespace) -> SpeedTestProtocol:
@@ -218,19 +236,11 @@ def result_to_json(result: SpeedTestResult) -> str:
     return json.dumps(convert(result), indent=2, sort_keys=True)
 
 
-async def async_main(argv: Sequence[str] | None = None) -> int:
-    """Async CLI body."""
-    parser = build_parser()
-    args = parser.parse_args(argv)
-    console = Console(stderr=True)
-
-    if args.list_presets:
-        for name, urls in PRESETS.items():
-            print(f"{name}  →  {urls['server']}")
-        return 0
-
-    resolve_args(args)
-
+async def _run_single(
+    args: argparse.Namespace,
+    console: Console,
+) -> int:
+    """Run one speed test and return exit code."""
     try:
         engine = make_engine(args)
         include_upload = not args.no_upload
@@ -246,6 +256,71 @@ async def async_main(argv: Sequence[str] | None = None) -> int:
     except Exception as exc:  # pragma: no cover - defensive user-facing path
         console.print(f"[red]Error:[/red] {exc}")
         return 1
+
+
+async def _interactive_session(
+    args: argparse.Namespace,
+    console: Console,
+) -> int:
+    """Run the interactive command session."""
+    console.print("[bold green]Speed Test TUI[/bold green] — Interactive session")
+    console.print("Type /help for available commands.\n")
+
+    while True:
+        try:
+            cmd = console.input("[bold blue]> [/bold blue]").strip()
+        except (EOFError, KeyboardInterrupt):
+            console.print("\n[yellow]Goodbye.[/yellow]")
+            return 0
+
+        if not cmd:
+            continue
+
+        if cmd in ("/quit", "/q", "/exit"):
+            console.print("[yellow]Goodbye.[/yellow]")
+            return 0
+        elif cmd == "/help":
+            console.print(_HELP_TEXT)
+        elif cmd == "/run":
+            await _run_single(args, console)
+        elif cmd == "/presets":
+            for name, urls in PRESETS.items():
+                marker = " *" if args.preset == name else ""
+                console.print(f"  {name}{marker}  →  {urls['server']}")
+        elif cmd == "/server":
+            console.print(f"  Current server: {args.server}")
+        elif cmd.startswith("/preset "):
+            name = cmd[len("/preset "):].strip()
+            if name in PRESETS:
+                args.preset = name
+                resolve_args(args)
+                console.print(f"[green]Preset switched to {name}.[/green]")
+            else:
+                console.print(f"[red]Unknown preset: {name}[/red]")
+        else:
+            console.print(f"[yellow]Unknown command: {cmd}[/yellow]")
+
+
+async def async_main(argv: Sequence[str] | None = None) -> int:
+    """Async CLI body."""
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    console = Console(stderr=True)
+
+    if args.list_presets:
+        for name, urls in PRESETS.items():
+            print(f"{name}  →  {urls['server']}")
+        return 0
+
+    args._explicit_server = args.server is not None
+    args._explicit_download = args.download_url is not None
+    args._explicit_upload = args.upload_url is not None
+    resolve_args(args)
+
+    if args.json or args.run_once:
+        return await _run_single(args, console)
+
+    return await _interactive_session(args, console)
 
 
 def main(argv: Sequence[str] | None = None) -> int:

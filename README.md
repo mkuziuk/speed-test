@@ -20,29 +20,48 @@ python -m pip install -e ".[dev]"
 
 ## Usage
 
+Running `speed-test` without `--json` or `--run-once` starts an **interactive session**:
+
 ```bash
-# Run a speed test against the default Cloudflare speed-test endpoints
 speed-test
+```
+
+Session commands:
+
+| Command | Description |
+|---------|-------------|
+| `/run` | Run a speed test with current settings |
+| `/preset <name>` | Switch to a preset (cloudflare, ru-moscow) |
+| `/presets` | List available presets |
+| `/server` | Show current server URL |
+| `/help` | Show help |
+| `/quit`, `/q`, `/exit` | Exit the session |
+
+Non-interactive modes:
+
+```bash
+# Run one test and exit
+speed-test --run-once
+
+# Output results as JSON and exit
+speed-test --json
 
 # Run against a custom compatible server
 speed-test --server https://speed.cloudflare.com \
   --download-url 'https://speed.cloudflare.com/__down?bytes=25000000' \
-  --upload-url 'https://speed.cloudflare.com/__up'
+  --upload-url 'https://speed.cloudflare.com/__up' --run-once
 
 # Skip upload test
-speed-test --no-upload
-
-# Output results as JSON
-speed-test --json
+speed-test --run-once --no-upload
 
 # Use fake engine for testing (no network)
-speed-test --fake
+speed-test --fake --run-once
 
 # Run as a module
-python -m speed_test_tui --fake
+python -m speed_test_tui --fake --run-once
 
 # Use the Russian Moscow preset (when Cloudflare is blocked)
-speed-test --preset ru-moscow
+speed-test --preset ru-moscow --run-once
 ```
 
 ## Options
@@ -55,7 +74,8 @@ speed-test --preset ru-moscow
 | `--no-upload` | | `False` | Skip upload test |
 | `--duration` | `-d` | `10.0` | Test duration in seconds per phase |
 | `--concurrency` | `-c` | `4` | Number of concurrent connections |
-| `--json` | | `False` | Output results as JSON |
+| `--json` | | `False` | Output results as JSON and exit |
+| `--run-once` | | `False` | Run one test and exit |
 | `--list-presets` | | `False` | List available presets and exit |
 | `--preset` | | `cloudflare` | Speed-test server preset (cloudflare, ru-moscow) |
 | `--fake` | | `False` | Use fake engine (no network) |
