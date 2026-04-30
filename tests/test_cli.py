@@ -1,5 +1,6 @@
 """Tests for CLI orchestration and JSON output."""
 
+import asyncio
 import json
 
 import pytest
@@ -87,6 +88,47 @@ async def test_async_main_json_fake_outputs_valid_json(capsys):
 
     assert status == 0
     payload = json.loads(capsys.readouterr().out)
-    assert payload["server_url"] == "fake://local-speed-test"
+    assert payload["server_url"] == "https://speed.cloudflare.com"
     assert payload["download"]["speed_mbps"] == 100.0
     assert payload["upload"] is None
+
+
+def test_list_presets_output(capsys):
+    """--list-presets prints known presets and exits cleanly."""
+    status = asyncio.run(async_main(["--list-presets"]))
+    assert status == 0
+    captured = capsys.readouterr().out
+    assert "cloudflare" in captured
+    assert "ru-moscow" in captured
+    assert "speed.cloudflare.com" in captured
+    assert "mosoblcom.ru" in captured
+
+
+@pytest.mark.asyncio
+async def test_preset_ru_moscow_sets_urls(capsys):
+    """--preset ru-moscow applies Moscow URLs and shows in JSON output."""
+    status = await async_main(["--preset", "ru-moscow", "--fake", "--duration", "0.1", "--json", "--no-upload"])
+    assert status == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["server_url"] == "http://speedtest.mosoblcom.ru:8080"
+
+
+@pytest.mark.asyncio
+async def test_preset_default_is_cloudflare(capsys):
+    """Default preset (no --preset) resolves to Cloudflare."""
+    status = await async_main(["--fake", "--duration", "0.1", "--json", "--no-upload"])
+    assert status == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["server_url"] == "https://speed.cloudflare.com"
+
+
+@pytest.mark.asyncio
+async def test_preset_override_with_explicit_server(capsys):
+    """--server overrides the preset's server URL."""
+    status = await async_main([
+        "--preset", "ru-moscow", "--server", "https://custom.example.com",
+        "--fake", "--duration", "0.1", "--json", "--no-upload",
+    ])
+    assert status == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["server_url"] == "https://custom.example.com"

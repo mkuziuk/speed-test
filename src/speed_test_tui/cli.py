@@ -17,9 +17,18 @@ from .engine import SpeedTestEngine
 from .fake import FakeSpeedTest
 from .interface import PingResult, SpeedResult, SpeedTestProtocol, SpeedTestResult
 
-DEFAULT_SERVER_URL = "https://speed.cloudflare.com"
-DEFAULT_DOWNLOAD_URL = "https://speed.cloudflare.com/__down?bytes=25000000"
-DEFAULT_UPLOAD_URL = "https://speed.cloudflare.com/__up"
+PRESETS: dict[str, dict[str, str]] = {
+    "cloudflare": {
+        "server": "https://speed.cloudflare.com",
+        "download_url": "https://speed.cloudflare.com/__down?bytes=25000000",
+        "upload_url": "https://speed.cloudflare.com/__up",
+    },
+    "ru-moscow": {
+        "server": "http://speedtest.mosoblcom.ru:8080",
+        "download_url": "http://speedtest.mosoblcom.ru:8080/speedtest/random4000x4000.jpg",
+        "upload_url": "http://speedtest.mosoblcom.ru:8080/speedtest/upload.php",
+    },
+}
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -31,18 +40,29 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--server",
         "-s",
-        default=DEFAULT_SERVER_URL,
-        help=f"Base server URL for ping checks (default: {DEFAULT_SERVER_URL})",
+        default=None,
+        help="Base server URL for ping checks (default: cloudflare preset).",
     )
     parser.add_argument(
         "--download-url",
-        default=DEFAULT_DOWNLOAD_URL,
-        help="Download endpoint URL.",
+        default=None,
+        help="Download endpoint URL (default: cloudflare preset).",
     )
     parser.add_argument(
         "--upload-url",
-        default=DEFAULT_UPLOAD_URL,
-        help="Upload endpoint URL.",
+        default=None,
+        help="Upload endpoint URL (default: cloudflare preset).",
+    )
+    parser.add_argument(
+        "--preset",
+        default="cloudflare",
+        choices=list(PRESETS.keys()),
+        help="Speed-test server preset (default: cloudflare).",
+    )
+    parser.add_argument(
+        "--list-presets",
+        action="store_true",
+        help="List available presets and exit.",
     )
     parser.add_argument(
         "--no-upload",
@@ -82,6 +102,14 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def resolve_args(args: argparse.Namespace) -> None:
+    """Apply preset defaults when the user did not provide explicit URLs."""
+    preset = PRESETS[args.preset]
+    args.server = args.server or preset["server"]
+    args.download_url = args.download_url or preset["download_url"]
+    args.upload_url = args.upload_url or preset["upload_url"]
+
+
 def make_engine(args: argparse.Namespace) -> SpeedTestProtocol:
     """Create the selected speed-test implementation."""
     if args.duration <= 0:
@@ -96,7 +124,7 @@ def make_engine(args: argparse.Namespace) -> SpeedTestProtocol:
             ping_delay=0.05,
             download_duration=min(args.duration, 1.0),
             upload_duration=min(args.duration, 1.0),
-            server_url="fake://local-speed-test",
+            server_url=args.server,
         )
 
     return SpeedTestEngine(
@@ -195,6 +223,13 @@ async def async_main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     console = Console(stderr=True)
+
+    if args.list_presets:
+        for name, urls in PRESETS.items():
+            print(f"{name}  →  {urls['server']}")
+        return 0
+
+    resolve_args(args)
 
     try:
         engine = make_engine(args)

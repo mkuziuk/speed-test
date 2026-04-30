@@ -40,6 +40,9 @@ speed-test --fake
 
 # Run as a module
 python -m speed_test_tui --fake
+
+# Use the Russian Moscow preset (when Cloudflare is blocked)
+speed-test --preset ru-moscow
 ```
 
 ## Options
@@ -53,8 +56,28 @@ python -m speed_test_tui --fake
 | `--duration` | `-d` | `10.0` | Test duration in seconds per phase |
 | `--concurrency` | `-c` | `4` | Number of concurrent connections |
 | `--json` | | `False` | Output results as JSON |
+| `--list-presets` | | `False` | List available presets and exit |
+| `--preset` | | `cloudflare` | Speed-test server preset (cloudflare, ru-moscow) |
 | `--fake` | | `False` | Use fake engine (no network) |
-| `--debug` | | `False` | Enable debug output |
+
+## Presets
+
+| Preset | Server | Download URL | Upload URL |
+|--------|--------|-------------|-------------|
+| `cloudflare` | `https://speed.cloudflare.com` | `__down?bytes=25000000` | `__up` |
+| `ru-moscow` | `http://speedtest.mosoblcom.ru:8080` | `/speedtest/random4000x4000.jpg` | `/speedtest/upload.php` |
+
+Presets set the `--server`, `--download-url`, and `--upload-url` defaults. 
+Explicit `--server`, `--download-url`, or `--upload-url` flags override the preset values.
+
+Example:
+```bash
+# Use the Moscow preset
+speed-test --preset ru-moscow
+
+# Override just the server, keep Moscow download/upload URLs
+speed-test --preset ru-moscow --server https://my-custom-server.example.com
+```
 
 ## Development
 
