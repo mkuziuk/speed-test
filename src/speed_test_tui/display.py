@@ -64,6 +64,7 @@ class SpeedTestDisplay:
         table = Table(title="Speed Test Results", box=box.ROUNDED)
         table.add_column("Metric", style="cyan")
         table.add_column("Value", style="green", justify="right")
+        table.add_column("Gauge")
 
         # Ping section
         if result.ping:
@@ -74,22 +75,30 @@ class SpeedTestDisplay:
 
         # Download section
         if result.download:
-            table.add_row("", "")  # Spacer
+            table.add_row("", "", "")  # Spacer
             table.add_row(
-                "Download", f"{result.download.speed_mbps:.1f} Mbps"
+                "Download",
+                f"{result.download.speed_mbps:.1f} Mbps",
+                self._render_gauge(result.download.speed_mbps),
             )
             table.add_row(
-                "", self._format_bytes(result.download.bytes_transferred)
+                "",
+                self._format_bytes(result.download.bytes_transferred),
+                "",
             )
 
         # Upload section
         if result.upload:
-            table.add_row("", "")  # Spacer
+            table.add_row("", "", "")  # Spacer
             table.add_row(
-                "Upload", f"{result.upload.speed_mbps:.1f} Mbps"
+                "Upload",
+                f"{result.upload.speed_mbps:.1f} Mbps",
+                self._render_gauge(result.upload.speed_mbps),
             )
             table.add_row(
-                "", self._format_bytes(result.upload.bytes_transferred)
+                "",
+                self._format_bytes(result.upload.bytes_transferred),
+                "",
             )
 
         self.console.print(table)
@@ -122,6 +131,7 @@ class SpeedTestDisplay:
                     f"[green]{indicator}[/green] Download: {speed:.1f} Mbps "
                     f"({self._format_bytes(self._download_result.bytes_transferred)})"
                 )
+                lines.append(f"  {self._render_gauge(speed)}")
 
         if self._upload_result:
             speed = self._upload_result.speed_mbps
@@ -134,6 +144,7 @@ class SpeedTestDisplay:
                     f"[green]{indicator}[/green] Upload: {speed:.1f} Mbps "
                     f"({self._format_bytes(self._upload_result.bytes_transferred)})"
                 )
+                lines.append(f"  {self._render_gauge(speed)}")
 
         if not lines:
             lines.append("[dim]Starting test...[/dim]")
@@ -143,6 +154,20 @@ class SpeedTestDisplay:
         content = f"{body_text}\n\n{footer}"
 
         return Panel(content, title="Speed Test TUI", border_style="blue")
+
+    @staticmethod
+    def _render_gauge(speed_mbps: float, width: int = 20) -> str:
+        """Return a Rich-formatted colored gauge bar string."""
+        max_speed = 200.0
+        filled = min(speed_mbps / max_speed, 1.0)
+        filled_chars = int(filled * width)
+        empty_chars = width - filled_chars
+        bar = "█" * filled_chars + "░" * empty_chars
+        if speed_mbps < 25:
+            return f"[red]{bar}[/red]"
+        if speed_mbps < 100:
+            return f"[yellow]{bar}[/yellow]"
+        return f"[bright_green]{bar}[/bright_green]"
 
     @staticmethod
     def _format_bytes(bytes_count: int) -> str:

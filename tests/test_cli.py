@@ -70,6 +70,18 @@ def test_make_engine_rejects_invalid_duration():
 
 
 @pytest.mark.asyncio
+async def test_run_with_display_shows_gauge_and_mbps():
+    engine = FakeSpeedTest(ping_delay=0, download_duration=0, upload_duration=0)
+    console = Console(record=True, force_terminal=False, width=100)
+    result = await run_with_display(engine, include_upload=True, console=console)
+    exported = console.export_text()
+    assert "Mbps" in exported
+    assert "MB/s" not in exported
+    # Gauge characters should appear
+    assert "█" in exported or "░" in exported
+
+
+@pytest.mark.asyncio
 async def test_async_main_json_fake_outputs_valid_json(capsys):
     status = await async_main(["--fake", "--duration", "0.1", "--json", "--no-upload"])
 
