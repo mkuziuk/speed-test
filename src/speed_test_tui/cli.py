@@ -15,6 +15,7 @@ from rich.console import Console
 from .display import SpeedTestDisplay
 from .engine import SpeedTestEngine
 from .fake import FakeSpeedTest
+from .input_helper import prompt_input
 from .interface import PingResult, SpeedResult, SpeedTestProtocol, SpeedTestResult
 
 PRESETS: dict[str, dict[str, str]] = {
@@ -268,7 +269,7 @@ async def _interactive_session(
 
     while True:
         try:
-            cmd = console.input("[bold blue]> [/bold blue]").strip()
+            cmd = await prompt_input(console, "> ")
         except (EOFError, KeyboardInterrupt):
             console.print("\n[yellow]Goodbye.[/yellow]")
             return 0

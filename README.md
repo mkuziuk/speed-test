@@ -26,6 +26,8 @@ Running `speed-test` without `--json` or `--run-once` starts an **interactive se
 speed-test
 ```
 
+When running in a terminal, the interactive prompt provides **inline command completion and a live suggestion toolbar** (powered by `prompt_toolkit`). In non-TTY environments or when `prompt_toolkit` is unavailable, it falls back to the standard prompt so scripted usage continues to work.
+
 Session commands:
 
 | Command | Description |
