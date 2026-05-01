@@ -52,23 +52,23 @@ def build_parser() -> argparse.ArgumentParser:
         "--server",
         "-s",
         default=None,
-        help="Base server URL for ping checks (default: cloudflare preset).",
+        help="Base server URL for ping checks (default: ru-moscow preset).",
     )
     parser.add_argument(
         "--download-url",
         default=None,
-        help="Download endpoint URL (default: cloudflare preset).",
+        help="Download endpoint URL (default: ru-moscow preset).",
     )
     parser.add_argument(
         "--upload-url",
         default=None,
-        help="Upload endpoint URL (default: cloudflare preset).",
+        help="Upload endpoint URL (default: ru-moscow preset).",
     )
     parser.add_argument(
         "--preset",
-        default="cloudflare",
+        default="ru-moscow",
         choices=list(PRESETS.keys()),
-        help="Speed-test server preset (default: cloudflare).",
+        help="Speed-test server preset (default: ru-moscow).",
     )
     parser.add_argument(
         "--list-presets",

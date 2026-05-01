@@ -33,7 +33,7 @@ Session commands:
 | Command | Description |
 |---------|-------------|
 | `/run` | Run a speed test with current settings |
-| `/preset <name>` | Switch to a preset (cloudflare, ru-moscow) |
+| `/preset <name>` | Switch to a preset (ru-moscow, cloudflare) |
 | `/presets` | List available presets |
 | `/server` | Show current server URL |
 | `/help` | Show help |
@@ -70,16 +70,16 @@ speed-test --preset ru-moscow --run-once
 
 | Option | Short | Default | Description |
 |--------|-------|---------|-------------|
-| `--server` | `-s` | `https://speed.cloudflare.com` | Base server URL for ping checks |
-| `--download-url` | | Cloudflare `__down` endpoint | Download endpoint |
-| `--upload-url` | | Cloudflare `__up` endpoint | Upload endpoint |
+| `--server` | `-s` | `http://speedtest.mosoblcom.ru:8080` | Base server URL for ping checks |
+| `--download-url` | | Moscow `/speedtest/random4000x4000.jpg` | Download endpoint |
+| `--upload-url` | | Moscow `/speedtest/upload.php` | Upload endpoint |
 | `--no-upload` | | `False` | Skip upload test |
 | `--duration` | `-d` | `10.0` | Test duration in seconds per phase |
 | `--concurrency` | `-c` | `4` | Number of concurrent connections |
 | `--json` | | `False` | Output results as JSON and exit |
 | `--run-once` | | `False` | Run one test and exit |
 | `--list-presets` | | `False` | List available presets and exit |
-| `--preset` | | `cloudflare` | Speed-test server preset (cloudflare, ru-moscow) |
+| `--preset` | | `ru-moscow` | Speed-test server preset (ru-moscow, cloudflare) |
 | `--fake` | | `False` | Use fake engine (no network) |
 
 ## Presets
