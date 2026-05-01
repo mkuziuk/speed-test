@@ -328,7 +328,8 @@ async def _interactive_session(
 
 async def async_main(argv: Sequence[str] | None = None) -> int:
     """Async CLI body."""
-    argv = list(argv) if argv is not None else []
+    if argv is None:
+        argv = sys.argv[1:]
 
     cmd, rest_argv = _extract_command(argv)
     if cmd == "install":

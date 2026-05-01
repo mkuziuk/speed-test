@@ -2,12 +2,14 @@
 
 import asyncio
 import json
+import sys
 from unittest.mock import patch
 
 import pytest
 from rich.console import Console
 
 from speed_test_tui.cli import (
+    _extract_command,
     async_main,
     collect_results,
     make_engine,
@@ -228,3 +230,19 @@ async def test_run_once_with_json_outputs_json(capsys):
     payload = json.loads(capsys.readouterr().out)
     assert payload["server_url"] == "https://speed.cloudflare.com"
     assert payload["download"]["speed_mbps"] == 100.0
+
+
+def test_extract_command_finds_first_non_option():
+    assert _extract_command(["install", "--dry-run"]) == ("install", ["--dry-run"])
+    assert _extract_command(["--dry-run", "update"]) == ("update", ["--dry-run"])
+    assert _extract_command(["--fake"]) == (None, ["--fake"])
+    assert _extract_command([]) == (None, [])
+
+
+@pytest.mark.asyncio
+async def test_async_main_none_uses_sys_argv(capsys):
+    with patch.object(sys, "argv", ["speed-test", "--list-presets"]):
+        status = await async_main(None)
+    assert status == 0
+    out = capsys.readouterr().out
+    assert "cloudflare" in out
