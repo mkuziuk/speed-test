@@ -66,20 +66,36 @@ python -m speed_test_tui --fake --run-once
 speed-test --preset ru-moscow --run-once
 ```
 
+## Self-management commands
+
+```bash
+# Install a local symlink or wrapper script into ~/.local/bin
+speed-test install
+
+# Preview what install would do
+speed-test install --dry-run
+
+# Update from the git source (only works when installed from a git clone)
+speed-test update
+
+# Preview what update would do
+speed-test update --dry-run
+```
+
 ## Options
 
 | Option | Short | Default | Description |
 |--------|-------|---------|-------------|
-| `--server` | `-s` | `http://speedtest.mosoblcom.ru:8080` | Base server URL for ping checks |
-| `--download-url` | | Moscow `/speedtest/random4000x4000.jpg` | Download endpoint |
-| `--upload-url` | | Moscow `/speedtest/upload.php` | Upload endpoint |
+| `--server` | `-s` | `https://speed.cloudflare.com` | Base server URL for ping checks |
+| `--download-url` | | Cloudflare `__down?bytes=25000000` | Download endpoint |
+| `--upload-url` | | Cloudflare `__up` | Upload endpoint |
 | `--no-upload` | | `False` | Skip upload test |
 | `--duration` | `-d` | `10.0` | Test duration in seconds per phase |
 | `--concurrency` | `-c` | `4` | Number of concurrent connections |
 | `--json` | | `False` | Output results as JSON and exit |
 | `--run-once` | | `False` | Run one test and exit |
 | `--list-presets` | | `False` | List available presets and exit |
-| `--preset` | | `ru-moscow` | Speed-test server preset (ru-moscow, cloudflare) |
+| `--preset` | | `cloudflare` (or saved preset) | Speed-test server preset (cloudflare, ru-moscow) |
 | `--fake` | | `False` | Use fake engine (no network) |
 
 ## Presets

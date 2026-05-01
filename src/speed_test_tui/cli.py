@@ -18,6 +18,10 @@ from .fake import FakeSpeedTest
 from .input_helper import prompt_input
 from .interface import PingResult, SpeedResult, SpeedTestProtocol, SpeedTestResult
 
+from .config import get_saved_preset, set_saved_preset
+from .install import install as _run_install
+from .update import update as _run_update
+
 PRESETS: dict[str, dict[str, str]] = {
     "cloudflare": {
         "server": "https://speed.cloudflare.com",
@@ -42,33 +46,42 @@ Available commands:
 """.format(presets=", ".join(PRESETS.keys()))
 
 
+def _extract_command(argv: Sequence[str]) -> tuple[str | None, list[str]]:
+    """Return the first non-option token as a command and the remaining argv."""
+    for i, arg in enumerate(argv):
+        if not arg.startswith("-"):
+            return arg, list(argv[:i]) + list(argv[i + 1 :])
+    return None, list(argv)
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build the CLI parser."""
     parser = argparse.ArgumentParser(
         prog="speed-test",
         description="Minimal terminal internet speed test.",
+        epilog="Additional commands: install, update (both support --dry-run).",
     )
     parser.add_argument(
         "--server",
         "-s",
         default=None,
-        help="Base server URL for ping checks (default: ru-moscow preset).",
+        help="Base server URL for ping checks (default: from preset).",
     )
     parser.add_argument(
         "--download-url",
         default=None,
-        help="Download endpoint URL (default: ru-moscow preset).",
+        help="Download endpoint URL (default: from preset).",
     )
     parser.add_argument(
         "--upload-url",
         default=None,
-        help="Upload endpoint URL (default: ru-moscow preset).",
+        help="Upload endpoint URL (default: from preset).",
     )
     parser.add_argument(
         "--preset",
-        default="ru-moscow",
+        default=None,
         choices=list(PRESETS.keys()),
-        help="Speed-test server preset (default: ru-moscow).",
+        help="Speed-test server preset (default: saved preset or cloudflare).",
     )
     parser.add_argument(
         "--list-presets",
@@ -116,6 +129,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="Use deterministic fake results without network calls.",
     )
     return parser
+
+
+def resolve_preset(args: argparse.Namespace) -> None:
+    """Choose effective preset: explicit CLI > saved config > built-in default."""
+    if getattr(args, "_explicit_preset", False):
+        return
+    saved = get_saved_preset()
+    args.preset = saved if saved else "cloudflare"
 
 
 def resolve_args(args: argparse.Namespace) -> None:
@@ -194,7 +215,9 @@ async def run_with_display(
                 display.update_download(payload)
             elif phase == "download" and isinstance(payload, SpeedResult):
                 latest_download = payload
-                display.update_phase("Testing Upload" if include_upload else "Complete", 0.70)
+                display.update_phase(
+                    "Testing Upload" if include_upload else "Complete", 0.70
+                )
                 display.update_download(payload)
             elif phase == "upload_progress" and isinstance(payload, SpeedResult):
                 latest_upload = payload
@@ -295,6 +318,7 @@ async def _interactive_session(
             if name in PRESETS:
                 args.preset = name
                 resolve_args(args)
+                set_saved_preset(name)
                 console.print(f"[green]Preset switched to {name}.[/green]")
             else:
                 console.print(f"[red]Unknown preset: {name}[/red]")
@@ -304,6 +328,16 @@ async def _interactive_session(
 
 async def async_main(argv: Sequence[str] | None = None) -> int:
     """Async CLI body."""
+    argv = list(argv) if argv is not None else []
+
+    cmd, rest_argv = _extract_command(argv)
+    if cmd == "install":
+        dry_run = "--dry-run" in rest_argv
+        return _run_install(dry_run=dry_run)
+    if cmd == "update":
+        dry_run = "--dry-run" in rest_argv
+        return _run_update(dry_run=dry_run)
+
     parser = build_parser()
     args = parser.parse_args(argv)
     console = Console(stderr=True)
@@ -316,6 +350,9 @@ async def async_main(argv: Sequence[str] | None = None) -> int:
     args._explicit_server = args.server is not None
     args._explicit_download = args.download_url is not None
     args._explicit_upload = args.upload_url is not None
+    args._explicit_preset = args.preset is not None
+
+    resolve_preset(args)
     resolve_args(args)
 
     if args.json or args.run_once:

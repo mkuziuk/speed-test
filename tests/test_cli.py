@@ -95,7 +95,7 @@ async def test_async_main_json_fake_outputs_valid_json(capsys):
 
     assert status == 0
     payload = json.loads(capsys.readouterr().out)
-    assert payload["server_url"] == "http://speedtest.mosoblcom.ru:8080"
+    assert payload["server_url"] == "https://speed.cloudflare.com"
     assert payload["download"]["speed_mbps"] == 100.0
     assert payload["upload"] is None
 
@@ -121,12 +121,12 @@ async def test_preset_ru_moscow_sets_urls(capsys):
 
 
 @pytest.mark.asyncio
-async def test_preset_default_is_ru_moscow(capsys):
-    """Default preset (no --preset) resolves to ru-moscow."""
+async def test_preset_default_is_cloudflare(capsys):
+    """Default preset (no --preset) resolves to cloudflare."""
     status = await async_main(["--fake", "--duration", "0.1", "--json", "--no-upload"])
     assert status == 0
     payload = json.loads(capsys.readouterr().out)
-    assert payload["server_url"] == "http://speedtest.mosoblcom.ru:8080"
+    assert payload["server_url"] == "https://speed.cloudflare.com"
 
 
 @pytest.mark.asyncio
@@ -226,5 +226,5 @@ async def test_run_once_with_json_outputs_json(capsys):
     status = await async_main(["--fake", "--duration", "0.1", "--run-once", "--json", "--no-upload"])
     assert status == 0
     payload = json.loads(capsys.readouterr().out)
-    assert payload["server_url"] == "http://speedtest.mosoblcom.ru:8080"
+    assert payload["server_url"] == "https://speed.cloudflare.com"
     assert payload["download"]["speed_mbps"] == 100.0
