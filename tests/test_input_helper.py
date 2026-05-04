@@ -73,8 +73,33 @@ async def test_prompt_input_uses_prompt_toolkit_when_available():
 
     console.input.assert_not_called()
     mock_session_cls.assert_called_once()
+    call_kwargs = mock_session_cls.call_args.kwargs
+    assert "key_bindings" in call_kwargs
+    assert "bottom_toolbar" in call_kwargs
     mock_session.prompt_async.assert_awaited_once_with("> ")
     assert result == "/quit"
+
+
+@pytest.mark.asyncio
+async def test_prompt_input_passes_custom_bottom_toolbar():
+    """Custom bottom_toolbar callable is forwarded to PromptSession."""
+    console = MagicMock(spec=Console)
+    mock_session_cls = MagicMock()
+    mock_session = MagicMock()
+    mock_session.prompt_async = AsyncMock(return_value="/run")
+    mock_session_cls.return_value = mock_session
+    custom_toolbar = lambda: "custom"  # noqa: E731
+
+    with patch.object(sys.stdin, "isatty", return_value=True):
+        with patch(
+            "speed_test_tui.input_helper._has_prompt_toolkit", return_value=True
+        ):
+            with patch("prompt_toolkit.PromptSession", mock_session_cls):
+                result = await prompt_input(console, "> ", bottom_toolbar=custom_toolbar)
+
+    call_kwargs = mock_session_cls.call_args.kwargs
+    assert call_kwargs.get("bottom_toolbar") is custom_toolbar
+    assert result == "/run"
 
 
 def test_bottom_toolbar_contains_all_primary_commands():
@@ -85,6 +110,12 @@ def test_bottom_toolbar_contains_all_primary_commands():
             continue
         assert cmd in toolbar
         assert _COMMAND_HELP[cmd] in toolbar
+
+
+def test_bottom_toolbar_shows_preset():
+    """Bottom toolbar includes the current preset when provided."""
+    toolbar = _bottom_toolbar(preset="ru-moscow")
+    assert "preset: ru-moscow" in toolbar
 
 
 def test_command_list_has_all_slash_commands():

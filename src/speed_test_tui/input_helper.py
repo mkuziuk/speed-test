@@ -27,8 +27,10 @@ _COMMAND_HELP = {
 }
 
 
-def _bottom_toolbar() -> str:
+def _bottom_toolbar(preset: str | None = None) -> str:
     pieces = []
+    if preset:
+        pieces.append(f"preset: {preset}")
     for cmd in _COMMANDS:
         if cmd in ("/q", "/exit"):
             continue
@@ -45,13 +47,28 @@ def _has_prompt_toolkit() -> bool:
         return False
 
 
-async def prompt_input(console: Console, text: str = "> ") -> str:
+async def prompt_input(
+    console: Console,
+    text: str = "> ",
+    bottom_toolbar=None,
+) -> str:
     """Read a line of input with completion when available and TTY attached."""
     if not sys.stdin.isatty() or not _has_prompt_toolkit():
-        return console.input(text).strip()
+        result = console.input(text)
+        if result == "\t":
+            return "\t"
+        return result.strip()
 
     from prompt_toolkit import PromptSession
     from prompt_toolkit.completion import WordCompleter
+    from prompt_toolkit.key_binding import KeyBindings
+    from prompt_toolkit.keys import Keys
+
+    kb = KeyBindings()
+
+    @kb.add(Keys.Tab)
+    def _on_tab(event):
+        event.app.exit(result="\t")
 
     completer = WordCompleter(
         _COMMANDS,
@@ -61,10 +78,13 @@ async def prompt_input(console: Console, text: str = "> ") -> str:
         match_middle=False,
     )
 
+    toolbar = bottom_toolbar if bottom_toolbar is not None else _bottom_toolbar
+
     session: PromptSession[str] = PromptSession(
         completer=completer,
         complete_while_typing=True,
-        bottom_toolbar=_bottom_toolbar,
+        bottom_toolbar=toolbar,
+        key_bindings=kb,
     )
 
     try:

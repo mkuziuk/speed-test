@@ -18,7 +18,7 @@ class SpeedTestDisplay:
     Uses rich.Live for real-time updates without screen flicker.
     """
 
-    def __init__(self, console: Optional[Console] = None):
+    def __init__(self, console: Optional[Console] = None, preset: Optional[str] = None):
         self.console = console or Console()
         self._live: Optional[Live] = None
         self._current_phase: str = "Initializing"
@@ -26,6 +26,7 @@ class SpeedTestDisplay:
         self._download_result: Optional[SpeedResult] = None
         self._upload_result: Optional[SpeedResult] = None
         self._progress: float = 0.0
+        self._preset = preset
 
     @contextmanager
     def live_display(self):
@@ -65,6 +66,9 @@ class SpeedTestDisplay:
         table.add_column("Metric", style="cyan")
         table.add_column("Value", style="green", justify="right")
         table.add_column("Gauge")
+
+        if result.preset:
+            table.add_row("Preset", f"[yellow]{result.preset}[/yellow]", "")
 
         # Ping section
         if result.ping:
@@ -153,7 +157,11 @@ class SpeedTestDisplay:
         footer = f"[dim]Phase: {self._current_phase} | Progress: {self._progress:.0%}[/dim]"
         content = f"{body_text}\n\n{footer}"
 
-        return Panel(content, title="Speed Test TUI", border_style="blue")
+        title = "Speed Test TUI"
+        if self._preset:
+            title = f"Speed Test TUI — {self._preset}"
+
+        return Panel(content, title=title, border_style="blue")
 
     @staticmethod
     def _render_gauge(speed_mbps: float, width: int = 20) -> str:

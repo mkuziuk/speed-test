@@ -34,10 +34,13 @@ Session commands:
 |---------|-------------|
 | `/run` | Run a speed test with current settings |
 | `/preset <name>` | Switch to a preset (ru-moscow, cloudflare) |
+| `Tab` | Cycle to the next preset |
 | `/presets` | List available presets |
 | `/server` | Show current server URL |
 | `/help` | Show help |
 | `/quit`, `/q`, `/exit` | Exit the session |
+
+The prompt shows the current preset (e.g., `[cloudflare] >`), and the active preset is marked `(active)` in `/presets` and `--list-presets` output. The preset name is also included in JSON results and the live TUI summary.
 
 Non-interactive modes:
 

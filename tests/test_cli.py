@@ -92,6 +92,16 @@ async def test_run_with_display_shows_gauge_and_mbps():
 
 
 @pytest.mark.asyncio
+async def test_run_with_display_shows_preset():
+    engine = FakeSpeedTest(ping_delay=0, download_duration=0, upload_duration=0)
+    console = Console(record=True, force_terminal=False, width=100)
+    result = await run_with_display(engine, include_upload=True, console=console, preset="ru-moscow")
+    exported = console.export_text()
+    assert "ru-moscow" in exported
+    assert result.preset == "ru-moscow"
+
+
+@pytest.mark.asyncio
 async def test_async_main_json_fake_outputs_valid_json(capsys):
     status = await async_main(["--fake", "--duration", "0.1", "--json", "--no-upload"])
 
@@ -100,6 +110,7 @@ async def test_async_main_json_fake_outputs_valid_json(capsys):
     assert payload["server_url"] == "https://speed.cloudflare.com"
     assert payload["download"]["speed_mbps"] == 100.0
     assert payload["upload"] is None
+    assert payload["preset"] == "cloudflare"
 
 
 def test_list_presets_output(capsys):
@@ -111,6 +122,7 @@ def test_list_presets_output(capsys):
     assert "ru-moscow" in captured
     assert "speed.cloudflare.com" in captured
     assert "mosoblcom.ru" in captured
+    assert "(active)" in captured
 
 
 @pytest.mark.asyncio
@@ -120,6 +132,7 @@ async def test_preset_ru_moscow_sets_urls(capsys):
     assert status == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["server_url"] == "http://speedtest.mosoblcom.ru:8080"
+    assert payload["preset"] == "ru-moscow"
 
 
 @pytest.mark.asyncio
@@ -129,6 +142,7 @@ async def test_preset_default_is_cloudflare(capsys):
     assert status == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["server_url"] == "https://speed.cloudflare.com"
+    assert payload["preset"] == "cloudflare"
 
 
 @pytest.mark.asyncio
@@ -169,6 +183,30 @@ async def test_interactive_preset_command(capsys):
 
 
 @pytest.mark.asyncio
+async def test_interactive_tab_cycles_presets(capsys):
+    """Pressing Tab cycles to the next preset."""
+    inputs = ["\t", "/server", "/quit"]
+    with patch("rich.console.Console.input", side_effect=inputs):
+        status = await async_main(["--fake", "--duration", "0.1"])
+    assert status == 0
+    err = capsys.readouterr().err
+    assert "Preset switched to ru-moscow" in err
+    assert "speedtest.mosoblcom.ru" in err
+
+
+@pytest.mark.asyncio
+async def test_interactive_tab_cycles_presets_twice(capsys):
+    """Pressing Tab twice cycles through presets and wraps around."""
+    inputs = ["\t", "\t", "/server", "/quit"]
+    with patch("rich.console.Console.input", side_effect=inputs):
+        status = await async_main(["--fake", "--duration", "0.1"])
+    assert status == 0
+    err = capsys.readouterr().err
+    assert "Preset switched to ru-moscow" in err
+    assert "Preset switched to cloudflare" in err
+
+
+@pytest.mark.asyncio
 async def test_interactive_presets_command(capsys):
     inputs = ["/presets", "/quit"]
     with patch("rich.console.Console.input", side_effect=inputs):
@@ -177,6 +215,7 @@ async def test_interactive_presets_command(capsys):
     err = capsys.readouterr().err
     assert "cloudflare" in err
     assert "ru-moscow" in err
+    assert "(active)" in err
 
 
 @pytest.mark.asyncio
@@ -230,6 +269,7 @@ async def test_run_once_with_json_outputs_json(capsys):
     payload = json.loads(capsys.readouterr().out)
     assert payload["server_url"] == "https://speed.cloudflare.com"
     assert payload["download"]["speed_mbps"] == 100.0
+    assert payload["preset"] == "cloudflare"
 
 
 def test_extract_command_finds_first_non_option():

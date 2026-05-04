@@ -15,7 +15,7 @@ from rich.console import Console
 from .display import SpeedTestDisplay
 from .engine import SpeedTestEngine
 from .fake import FakeSpeedTest
-from .input_helper import prompt_input
+from .input_helper import prompt_input, _bottom_toolbar
 from .interface import PingResult, SpeedResult, SpeedTestProtocol, SpeedTestResult
 
 from .config import get_saved_preset, set_saved_preset
@@ -39,6 +39,7 @@ _HELP_TEXT = """\
 Available commands:
   /run              Run a speed test with current settings
   /preset <name>    Switch to a preset ({presets})
+  Tab               Cycle to the next preset
   /presets          List available presets
   /server           Show current server URL
   /help             Show this help message
@@ -197,9 +198,10 @@ async def run_with_display(
     *,
     include_upload: bool = True,
     console: Console | None = None,
+    preset: str | None = None,
 ) -> SpeedTestResult:
     """Run a speed test while updating the Rich display."""
-    display = SpeedTestDisplay(console=console)
+    display = SpeedTestDisplay(console=console, preset=preset)
     final: SpeedTestResult | None = None
     latest_download: SpeedResult | None = None
     latest_upload: SpeedResult | None = None
@@ -239,6 +241,7 @@ async def run_with_display(
 
     if final is None:
         raise RuntimeError("speed test did not produce a final result")
+    final.preset = preset
     display.show_summary(final)
     return final
 
@@ -270,9 +273,13 @@ async def _run_single(
         include_upload = not args.no_upload
         if args.json:
             result = await collect_results(engine, include_upload=include_upload)
+            result.preset = args.preset
             print(result_to_json(result))
         else:
-            await run_with_display(engine, include_upload=include_upload)
+            result = await run_with_display(
+                engine, include_upload=include_upload, preset=args.preset
+            )
+            result.preset = args.preset
         return 0
     except KeyboardInterrupt:
         console.print("\n[yellow]Cancelled.[/yellow]")
@@ -282,17 +289,37 @@ async def _run_single(
         return 1
 
 
+def _cycle_preset(args: argparse.Namespace) -> str:
+    """Switch to the next preset in order and apply it."""
+    preset_names = list(PRESETS.keys())
+    try:
+        current_index = preset_names.index(args.preset)
+    except ValueError:
+        current_index = -1
+    next_index = (current_index + 1) % len(preset_names)
+    next_preset = preset_names[next_index]
+    args.preset = next_preset
+    resolve_args(args)
+    set_saved_preset(next_preset)
+    return next_preset
+
+
 async def _interactive_session(
     args: argparse.Namespace,
     console: Console,
 ) -> int:
     """Run the interactive command session."""
-    console.print("[bold green]Speed Test TUI[/bold green] — Interactive session")
+    console.print(
+        f"[bold green]Speed Test TUI[/bold green] — Interactive session "
+        f"(preset: [yellow]{args.preset}[/yellow])"
+    )
     console.print("Type /help for available commands.\n")
 
     while True:
         try:
-            cmd = await prompt_input(console, "> ")
+            prompt_text = f"[{args.preset}] > "
+            toolbar = lambda: _bottom_toolbar(args.preset)  # noqa: E731
+            cmd = await prompt_input(console, prompt_text, bottom_toolbar=toolbar)
         except (EOFError, KeyboardInterrupt):
             console.print("\n[yellow]Goodbye.[/yellow]")
             return 0
@@ -309,10 +336,13 @@ async def _interactive_session(
             await _run_single(args, console)
         elif cmd == "/presets":
             for name, urls in PRESETS.items():
-                marker = " *" if args.preset == name else ""
+                marker = " (active)" if args.preset == name else ""
                 console.print(f"  {name}{marker}  →  {urls['server']}")
         elif cmd == "/server":
             console.print(f"  Current server: {args.server}")
+        elif cmd == "\t":
+            next_preset = _cycle_preset(args)
+            console.print(f"[green]Preset switched to {next_preset}.[/green]")
         elif cmd.startswith("/preset "):
             name = cmd[len("/preset "):].strip()
             if name in PRESETS:
@@ -343,17 +373,19 @@ async def async_main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
     console = Console(stderr=True)
 
-    if args.list_presets:
-        for name, urls in PRESETS.items():
-            print(f"{name}  →  {urls['server']}")
-        return 0
-
     args._explicit_server = args.server is not None
     args._explicit_download = args.download_url is not None
     args._explicit_upload = args.upload_url is not None
     args._explicit_preset = args.preset is not None
 
     resolve_preset(args)
+
+    if args.list_presets:
+        for name, urls in PRESETS.items():
+            marker = " (active)" if args.preset == name else ""
+            print(f"{name}{marker}  →  {urls['server']}")
+        return 0
+
     resolve_args(args)
 
     if args.json or args.run_once:

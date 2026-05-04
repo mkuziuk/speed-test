@@ -36,6 +36,7 @@ class SpeedTestResult:
     ping: Optional[PingResult] = None
     download: Optional[SpeedResult] = None
     upload: Optional[SpeedResult] = None
+    preset: Optional[str] = None
 
 
 @runtime_checkable
