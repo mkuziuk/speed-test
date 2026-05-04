@@ -38,13 +38,11 @@ PRESETS: dict[str, dict[str, str]] = {
 _HELP_TEXT = """\
 Available commands:
   /run              Run a speed test with current settings
-  /preset <name>    Switch to a preset ({presets})
-  Tab               Cycle to the next preset
-  /presets          List available presets
+  /preset           Switch to or choose a preset
   /server           Show current server URL
   /help             Show this help message
   /quit, /q, /exit  Exit the session
-""".format(presets=", ".join(PRESETS.keys()))
+"""
 
 
 def _extract_command(argv: Sequence[str]) -> tuple[str | None, list[str]]:
@@ -289,21 +287,6 @@ async def _run_single(
         return 1
 
 
-def _cycle_preset(args: argparse.Namespace) -> str:
-    """Switch to the next preset in order and apply it."""
-    preset_names = list(PRESETS.keys())
-    try:
-        current_index = preset_names.index(args.preset)
-    except ValueError:
-        current_index = -1
-    next_index = (current_index + 1) % len(preset_names)
-    next_preset = preset_names[next_index]
-    args.preset = next_preset
-    resolve_args(args)
-    set_saved_preset(next_preset)
-    return next_preset
-
-
 async def _interactive_session(
     args: argparse.Namespace,
     console: Console,
@@ -334,24 +317,43 @@ async def _interactive_session(
             console.print(_HELP_TEXT)
         elif cmd == "/run":
             await _run_single(args, console)
-        elif cmd == "/presets":
-            for name, urls in PRESETS.items():
+        elif cmd in ("/preset", "/presets"):
+            if cmd == "/presets":
+                console.print("[yellow]/presets is deprecated, use /preset to choose a preset[/yellow]")
+            console.print("Available presets:")
+            preset_names = list(PRESETS.keys())
+            for i, name in enumerate(preset_names, 1):
                 marker = " (active)" if args.preset == name else ""
-                console.print(f"  {name}{marker}  →  {urls['server']}")
-        elif cmd == "/server":
-            console.print(f"  Current server: {args.server}")
-        elif cmd == "\t":
-            next_preset = _cycle_preset(args)
-            console.print(f"[green]Preset switched to {next_preset}.[/green]")
+                console.print(f"  {i}) {name}{marker}")
+            choice = console.input("[bold]Choose preset (number or name):[/bold] ").strip()
+            selected = None
+            if choice.isdigit():
+                idx = int(choice) - 1
+                if 0 <= idx < len(preset_names):
+                    selected = preset_names[idx]
+            else:
+                for name in preset_names:
+                    if name.lower() == choice.lower():
+                        selected = name
+                        break
+            if selected is None:
+                console.print(f"[red]Unknown preset '{choice}'[/red]")
+                continue
+            args.preset = selected
+            resolve_args(args)
+            set_saved_preset(selected)
+            console.print(f"[green]Preset set to '{selected}'[/green]")
         elif cmd.startswith("/preset "):
             name = cmd[len("/preset "):].strip()
             if name in PRESETS:
                 args.preset = name
                 resolve_args(args)
                 set_saved_preset(name)
-                console.print(f"[green]Preset switched to {name}.[/green]")
+                console.print(f"[green]Preset set to '{name}'[/green]")
             else:
-                console.print(f"[red]Unknown preset: {name}[/red]")
+                console.print(f"[red]Unknown preset '{name}'[/red]")
+        elif cmd == "/server":
+            console.print(f"  Current server: {args.server}")
         else:
             console.print(f"[yellow]Unknown command: {cmd}[/yellow]")
 

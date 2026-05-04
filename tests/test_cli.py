@@ -178,44 +178,70 @@ async def test_interactive_preset_command(capsys):
     captured = capsys.readouterr()
     out = captured.out
     err = captured.err
-    assert "Preset switched to ru-moscow" in err
+    assert "Preset set to 'ru-moscow'" in err
     assert "speedtest.mosoblcom.ru" in err
-
-
-@pytest.mark.asyncio
-async def test_interactive_tab_cycles_presets(capsys):
-    """Pressing Tab cycles to the next preset."""
-    inputs = ["\t", "/server", "/quit"]
-    with patch("rich.console.Console.input", side_effect=inputs):
-        status = await async_main(["--fake", "--duration", "0.1"])
-    assert status == 0
-    err = capsys.readouterr().err
-    assert "Preset switched to ru-moscow" in err
-    assert "speedtest.mosoblcom.ru" in err
-
-
-@pytest.mark.asyncio
-async def test_interactive_tab_cycles_presets_twice(capsys):
-    """Pressing Tab twice cycles through presets and wraps around."""
-    inputs = ["\t", "\t", "/server", "/quit"]
-    with patch("rich.console.Console.input", side_effect=inputs):
-        status = await async_main(["--fake", "--duration", "0.1"])
-    assert status == 0
-    err = capsys.readouterr().err
-    assert "Preset switched to ru-moscow" in err
-    assert "Preset switched to cloudflare" in err
 
 
 @pytest.mark.asyncio
 async def test_interactive_presets_command(capsys):
-    inputs = ["/presets", "/quit"]
+    inputs = ["/presets", "1", "/quit"]
     with patch("rich.console.Console.input", side_effect=inputs):
         status = await async_main(["--fake", "--duration", "0.1"])
     assert status == 0
     err = capsys.readouterr().err
+    assert "/presets is deprecated" in err
     assert "cloudflare" in err
     assert "ru-moscow" in err
     assert "(active)" in err
+
+
+@pytest.mark.asyncio
+async def test_interactive_preset_menu_by_number(capsys):
+    """Typing /preset shows the menu; choosing by number switches preset."""
+    inputs = ["/preset", "2", "/server", "/quit"]
+    with patch("rich.console.Console.input", side_effect=inputs):
+        status = await async_main(["--fake", "--duration", "0.1"])
+    assert status == 0
+    err = capsys.readouterr().err
+    assert "Available presets:" in err
+    assert "1) cloudflare" in err
+    assert "2) ru-moscow" in err
+    assert "Preset set to 'ru-moscow'" in err
+    assert "speedtest.mosoblcom.ru" in err
+
+
+@pytest.mark.asyncio
+async def test_interactive_preset_menu_by_name(capsys):
+    """Choosing preset by name in the menu switches successfully."""
+    inputs = ["/preset", "ru-moscow", "/server", "/quit"]
+    with patch("rich.console.Console.input", side_effect=inputs):
+        status = await async_main(["--fake", "--duration", "0.1"])
+    assert status == 0
+    err = capsys.readouterr().err
+    assert "Preset set to 'ru-moscow'" in err
+
+
+@pytest.mark.asyncio
+async def test_interactive_preset_menu_unknown_choice(capsys):
+    """Unknown preset choice shows error and keeps running."""
+    inputs = ["/preset", "invalid", "/quit"]
+    with patch("rich.console.Console.input", side_effect=inputs):
+        status = await async_main(["--fake", "--duration", "0.1"])
+    assert status == 0
+    err = capsys.readouterr().err
+    assert "Unknown preset 'invalid'" in err
+
+
+@pytest.mark.asyncio
+async def test_interactive_preset_direct_with_arg(capsys):
+    """/preset <name> directly switches without showing menu."""
+    inputs = ["/preset ru-moscow", "/server", "/quit"]
+    with patch("rich.console.Console.input", side_effect=inputs):
+        status = await async_main(["--fake", "--duration", "0.1"])
+    assert status == 0
+    err = capsys.readouterr().err
+    assert "Preset set to 'ru-moscow'" in err
+    assert "speedtest.mosoblcom.ru" in err
 
 
 @pytest.mark.asyncio

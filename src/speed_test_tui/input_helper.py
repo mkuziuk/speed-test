@@ -7,7 +7,6 @@ from rich.console import Console
 _COMMANDS = [
     "/run",
     "/preset",
-    "/presets",
     "/server",
     "/help",
     "/quit",
@@ -17,8 +16,7 @@ _COMMANDS = [
 
 _COMMAND_HELP = {
     "/run": "Run a speed test",
-    "/preset": "Switch to a preset",
-    "/presets": "List available presets",
+    "/preset": "switch or choose a preset",
     "/server": "Show current server URL",
     "/help": "Show help",
     "/quit": "Exit the session",
@@ -54,21 +52,10 @@ async def prompt_input(
 ) -> str:
     """Read a line of input with completion when available and TTY attached."""
     if not sys.stdin.isatty() or not _has_prompt_toolkit():
-        result = console.input(text)
-        if result == "\t":
-            return "\t"
-        return result.strip()
+        return console.input(text).strip()
 
     from prompt_toolkit import PromptSession
     from prompt_toolkit.completion import WordCompleter
-    from prompt_toolkit.key_binding import KeyBindings
-    from prompt_toolkit.keys import Keys
-
-    kb = KeyBindings()
-
-    @kb.add(Keys.Tab)
-    def _on_tab(event):
-        event.app.exit(result="\t")
 
     completer = WordCompleter(
         _COMMANDS,
@@ -84,7 +71,6 @@ async def prompt_input(
         completer=completer,
         complete_while_typing=True,
         bottom_toolbar=toolbar,
-        key_bindings=kb,
     )
 
     try:

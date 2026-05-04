@@ -74,7 +74,7 @@ async def test_prompt_input_uses_prompt_toolkit_when_available():
     console.input.assert_not_called()
     mock_session_cls.assert_called_once()
     call_kwargs = mock_session_cls.call_args.kwargs
-    assert "key_bindings" in call_kwargs
+    assert "completer" in call_kwargs
     assert "bottom_toolbar" in call_kwargs
     mock_session.prompt_async.assert_awaited_once_with("> ")
     assert result == "/quit"
@@ -120,5 +120,5 @@ def test_bottom_toolbar_shows_preset():
 
 def test_command_list_has_all_slash_commands():
     """The exported command list covers the required slash commands."""
-    expected = {"/run", "/preset", "/presets", "/server", "/help", "/quit", "/q", "/exit"}
+    expected = {"/run", "/preset", "/server", "/help", "/quit", "/q", "/exit"}
     assert set(_COMMANDS) == expected
