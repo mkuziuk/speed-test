@@ -120,5 +120,5 @@ def test_bottom_toolbar_shows_preset():
 
 def test_command_list_has_all_slash_commands():
     """The exported command list covers the required slash commands."""
-    expected = {"/run", "/preset", "/server", "/help", "/quit", "/q", "/exit"}
+    expected = {"/run", "/preset", "/preset add", "/server", "/help", "/quit", "/q", "/exit"}
     assert set(_COMMANDS) == expected

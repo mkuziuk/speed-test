@@ -312,3 +312,246 @@ async def test_async_main_none_uses_sys_argv(capsys):
     assert status == 0
     out = capsys.readouterr().out
     assert "cloudflare" in out
+
+
+# --- Custom preset CLI tests ---
+
+
+@pytest.mark.asyncio
+async def test_custom_preset_add_command():
+    from speed_test_tui.config import get_custom_presets
+
+    status = await async_main([
+        "preset", "add", "mytest",
+        "--server", "http://s.com",
+        "--download-url", "http://s.com/dl",
+        "--upload-url", "http://s.com/ul",
+    ])
+    assert status == 0
+    assert get_custom_presets()["mytest"]["server"] == "http://s.com"
+
+
+@pytest.mark.asyncio
+async def test_custom_preset_add_missing_fields_fails():
+    from speed_test_tui.config import get_custom_presets
+
+    # missing --server
+    status = await async_main(["preset", "add", "bad", "--download-url", "x", "--upload-url", "x"])
+    assert status != 0
+    # missing --download-url
+    status = await async_main(["preset", "add", "bad", "--server", "x", "--upload-url", "x"])
+    assert status != 0
+    # missing --upload-url
+    status = await async_main(["preset", "add", "bad", "--server", "x", "--download-url", "x"])
+    assert status != 0
+    assert "bad" not in get_custom_presets()
+
+
+@pytest.mark.asyncio
+async def test_custom_preset_add_reserved_name_fails():
+    from speed_test_tui.config import get_custom_presets
+
+    for name in ("cloudflare", "ru-moscow"):
+        status = await async_main([
+            "preset", "add", name,
+            "--server", "http://s.com",
+            "--download-url", "http://s.com/dl",
+            "--upload-url", "http://s.com/ul",
+        ])
+        assert status != 0
+        assert name not in get_custom_presets()
+
+
+@pytest.mark.asyncio
+async def test_custom_preset_add_empty_name_fails():
+    from speed_test_tui.config import get_custom_presets
+
+    status = await async_main(["preset", "add", "", "--server", "x", "--download-url", "x", "--upload-url", "x"])
+    assert status != 0
+    status = await async_main(["preset", "add", "   ", "--server", "x", "--download-url", "x", "--upload-url", "x"])
+    assert status != 0
+    assert "" not in get_custom_presets()
+    assert "   " not in get_custom_presets()
+
+
+def test_custom_preset_list_presets_includes_custom(capsys):
+    from speed_test_tui.config import add_custom_preset
+
+    add_custom_preset("mytest", "http://x.com", "http://x.com/dl", "http://x.com/ul")
+    status = asyncio.run(async_main(["--list-presets"]))
+    assert status == 0
+    captured = capsys.readouterr().out
+    assert "cloudflare" in captured
+    assert "ru-moscow" in captured
+    assert "mytest" in captured
+
+
+@pytest.mark.asyncio
+async def test_custom_preset_usable_with_preset_flag(capsys):
+    from speed_test_tui.config import add_custom_preset
+
+    add_custom_preset("mytest", "http://fake.example.com", "http://fake.example.com/dl", "http://fake.example.com/ul")
+    status = await async_main([
+        "--preset", "mytest", "--fake", "--duration", "0.1", "--json", "--no-upload",
+    ])
+    assert status == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["server_url"] == "http://fake.example.com"
+    assert payload["preset"] == "mytest"
+
+
+@pytest.mark.asyncio
+async def test_custom_preset_interactive_menu_shows_custom(capsys):
+    from speed_test_tui.config import add_custom_preset
+
+    add_custom_preset("mytest", "http://x.com", "http://x.com/dl", "http://x.com/ul")
+    inputs = ["/preset", "1", "/quit"]
+    with patch("rich.console.Console.input", side_effect=inputs):
+        status = await async_main(["--fake", "--duration", "0.1"])
+    assert status == 0
+    err = capsys.readouterr().err
+    assert "cloudflare" in err
+    assert "ru-moscow" in err
+    assert "mytest" in err
+
+
+@pytest.mark.asyncio
+async def test_custom_preset_interactive_direct_switch(capsys):
+    from speed_test_tui.config import add_custom_preset
+
+    add_custom_preset("mytest", "http://x.com", "http://x.com/dl", "http://x.com/ul")
+    inputs = ["/preset mytest", "/server", "/quit"]
+    with patch("rich.console.Console.input", side_effect=inputs):
+        status = await async_main(["--fake", "--duration", "0.1"])
+    assert status == 0
+    err = capsys.readouterr().err
+    assert "Preset set to 'mytest'" in err
+    assert "http://x.com" in err
+
+
+@pytest.mark.asyncio
+async def test_custom_preset_interactive_menu_by_number(capsys):
+    from speed_test_tui.config import add_custom_preset
+
+    add_custom_preset("mytest", "http://x.com", "http://x.com/dl", "http://x.com/ul")
+    inputs = ["/preset", "3", "/quit"]
+    with patch("rich.console.Console.input", side_effect=inputs):
+        status = await async_main(["--fake", "--duration", "0.1"])
+    assert status == 0
+    err = capsys.readouterr().err
+    assert "Preset set to 'mytest'" in err
+
+
+@pytest.mark.asyncio
+async def test_interactive_preset_add_prompted_and_use_now(capsys):
+    from speed_test_tui.config import get_custom_presets, get_saved_preset
+
+    inputs = [
+        "/preset add",
+        "mytest",
+        "http://x.com",
+        "http://x.com/dl",
+        "http://x.com/ul",
+        "yes",
+        "/server",
+        "/quit",
+    ]
+    with patch("rich.console.Console.input", side_effect=inputs):
+        status = await async_main(["--fake", "--duration", "0.1"])
+
+    assert status == 0
+    presets = get_custom_presets()
+    assert presets["mytest"]["server"] == "http://x.com"
+    assert get_saved_preset() == "mytest"
+    err = capsys.readouterr().err
+    assert "Preset 'mytest' added" in err
+    assert "Preset set to 'mytest'" in err
+    assert "http://x.com" in err
+
+
+@pytest.mark.asyncio
+async def test_interactive_preset_add_prompted_without_switching_shows_in_menu(capsys):
+    from speed_test_tui.config import get_custom_presets, get_saved_preset
+
+    inputs = [
+        "/preset add",
+        "mytest",
+        "http://x.com",
+        "http://x.com/dl",
+        "http://x.com/ul",
+        "n",
+        "/preset",
+        "1",
+        "/quit",
+    ]
+    with patch("rich.console.Console.input", side_effect=inputs):
+        status = await async_main(["--fake", "--duration", "0.1"])
+
+    assert status == 0
+    assert "mytest" in get_custom_presets()
+    assert get_saved_preset() == "cloudflare"
+    err = capsys.readouterr().err
+    assert "Preset 'mytest' added" in err
+    assert "mytest" in err
+
+
+@pytest.mark.asyncio
+async def test_interactive_preset_add_rejects_built_in_name(capsys):
+    from speed_test_tui.config import get_custom_presets
+
+    inputs = [
+        "/preset add",
+        "cloudflare",
+        "http://x.com",
+        "http://x.com/dl",
+        "http://x.com/ul",
+        "/quit",
+    ]
+    with patch("rich.console.Console.input", side_effect=inputs):
+        status = await async_main(["--fake", "--duration", "0.1"])
+
+    assert status == 0
+    assert "cloudflare" not in get_custom_presets()
+    assert "built-in preset" in capsys.readouterr().err
+
+
+@pytest.mark.asyncio
+async def test_interactive_preset_add_rejects_blank_url(capsys):
+    from speed_test_tui.config import get_custom_presets
+
+    inputs = [
+        "/preset add",
+        "mytest",
+        "http://x.com",
+        "   ",
+        "http://x.com/ul",
+        "/quit",
+    ]
+    with patch("rich.console.Console.input", side_effect=inputs):
+        status = await async_main(["--fake", "--duration", "0.1"])
+
+    assert status == 0
+    assert "mytest" not in get_custom_presets()
+    assert "required" in capsys.readouterr().err
+
+
+@pytest.mark.asyncio
+async def test_interactive_preset_add_one_line_and_use_now(capsys):
+    from speed_test_tui.config import get_custom_presets, get_saved_preset
+
+    inputs = [
+        "/preset add mytest --server http://x.com --download-url http://x.com/dl --upload-url http://x.com/ul",
+        "y",
+        "/server",
+        "/quit",
+    ]
+    with patch("rich.console.Console.input", side_effect=inputs):
+        status = await async_main(["--fake", "--duration", "0.1"])
+
+    assert status == 0
+    assert get_custom_presets()["mytest"]["download_url"] == "http://x.com/dl"
+    assert get_saved_preset() == "mytest"
+    err = capsys.readouterr().err
+    assert "Preset 'mytest' added" in err
+    assert "Preset set to 'mytest'" in err
+    assert "http://x.com" in err

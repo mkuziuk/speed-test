@@ -33,7 +33,8 @@ Session commands:
 | Command | Description |
 |---------|-------------|
 | `/run` | Run a speed test with current settings |
-| `/preset <name>` | Switch to a preset (ru-moscow, cloudflare) |
+| `/preset <name>` | Switch to a preset (ru-moscow, cloudflare, or custom) |
+| `/preset add` | Add a custom preset interactively |
 | `Tab` | Cycle to the next preset |
 | `/presets` | List available presets |
 | `/server` | Show current server URL |
@@ -119,6 +120,44 @@ speed-test --preset ru-moscow
 # Override just the server, keep Moscow download/upload URLs
 speed-test --preset ru-moscow --server https://my-custom-server.example.com
 ```
+
+### Custom presets
+
+Add a custom preset from the command line:
+
+```bash
+speed-test preset add NAME --server URL --download-url URL --upload-url URL
+```
+
+Or add one inside the interactive TUI:
+
+```text
+[preset] > /preset add
+Preset name: NAME
+Server URL: URL
+Download URL: URL
+Upload URL: URL
+Use it now? [y/N]: y
+```
+
+You can also use the one-line form inside the TUI:
+
+```text
+[preset] > /preset add NAME --server URL --download-url URL --upload-url URL
+```
+
+All three URLs are required.
+
+Use a custom preset:
+
+```bash
+speed-test --preset NAME --run-once
+```
+
+Custom presets appear in:
+- `speed-test --list-presets`
+- `/presets` command in interactive session
+- `/preset` interactive menu
 
 ## Development
 

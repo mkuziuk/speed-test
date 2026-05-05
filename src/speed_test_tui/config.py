@@ -51,3 +51,30 @@ def set_saved_preset(preset: str) -> None:
     cfg = load_config()
     cfg["preset"] = preset
     save_config(cfg)
+
+
+def get_custom_presets() -> dict:
+    """Return custom user-defined presets."""
+    return load_config().get("custom_presets", {})
+
+
+def add_custom_preset(name: str, server: str, download_url: str, upload_url: str) -> None:
+    """Add or overwrite a custom preset."""
+    cfg = load_config()
+    if "custom_presets" not in cfg:
+        cfg["custom_presets"] = {}
+    cfg["custom_presets"][name] = {
+        "server": server,
+        "download_url": download_url,
+        "upload_url": upload_url,
+    }
+    save_config(cfg)
+
+
+def remove_custom_preset(name: str) -> None:
+    """Remove a custom preset if it exists."""
+    cfg = load_config()
+    custom = cfg.get("custom_presets", {})
+    if name in custom:
+        del custom[name]
+        save_config(cfg)

@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import shlex
 import sys
 from dataclasses import asdict, is_dataclass
 from datetime import datetime
@@ -18,7 +19,7 @@ from .fake import FakeSpeedTest
 from .input_helper import prompt_input, _bottom_toolbar
 from .interface import PingResult, SpeedResult, SpeedTestProtocol, SpeedTestResult
 
-from .config import get_saved_preset, set_saved_preset
+from .config import get_custom_presets, add_custom_preset, get_saved_preset, set_saved_preset
 from .install import install as _run_install
 from .update import update as _run_update
 
@@ -35,10 +36,16 @@ PRESETS: dict[str, dict[str, str]] = {
     },
 }
 
+
+def _all_presets() -> dict[str, dict[str, str]]:
+    return {**PRESETS, **get_custom_presets()}
+
+
 _HELP_TEXT = """\
 Available commands:
   /run              Run a speed test with current settings
   /preset           Switch to or choose a preset
+  /preset add       Add a custom preset (prompts for details or one-line args)
   /server           Show current server URL
   /help             Show this help message
   /quit, /q, /exit  Exit the session
@@ -79,7 +86,6 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--preset",
         default=None,
-        choices=list(PRESETS.keys()),
         help="Speed-test server preset (default: saved preset or cloudflare).",
     )
     parser.add_argument(
@@ -140,7 +146,10 @@ def resolve_preset(args: argparse.Namespace) -> None:
 
 def resolve_args(args: argparse.Namespace) -> None:
     """Apply preset defaults when the user did not provide explicit URLs."""
-    preset = PRESETS[args.preset]
+    all_presets = _all_presets()
+    if args.preset not in all_presets:
+        raise ValueError(f"Unknown preset '{args.preset}'")
+    preset = all_presets[args.preset]
     if not getattr(args, "_explicit_server", False):
         args.server = preset["server"]
     if not getattr(args, "_explicit_download", False):
@@ -321,7 +330,7 @@ async def _interactive_session(
             if cmd == "/presets":
                 console.print("[yellow]/presets is deprecated, use /preset to choose a preset[/yellow]")
             console.print("Available presets:")
-            preset_names = list(PRESETS.keys())
+            preset_names = list(_all_presets().keys())
             for i, name in enumerate(preset_names, 1):
                 marker = " (active)" if args.preset == name else ""
                 console.print(f"  {i}) {name}{marker}")
@@ -343,9 +352,50 @@ async def _interactive_session(
             resolve_args(args)
             set_saved_preset(selected)
             console.print(f"[green]Preset set to '{selected}'[/green]")
+        elif cmd == "/preset add" or cmd.startswith("/preset add "):
+            rest = cmd[len("/preset add"):].strip()
+            if rest:
+                try:
+                    name, server, download_url, upload_url = _parse_preset_add_args(
+                        shlex.split(rest)
+                    )
+                except ValueError as exc:
+                    console.print(f"[red]Invalid preset arguments:[/red] {exc}")
+                    continue
+            else:
+                name = console.input("[bold]Preset name:[/bold] ").strip()
+                server = console.input("[bold]Server URL:[/bold] ").strip()
+                download_url = console.input("[bold]Download URL:[/bold] ").strip()
+                upload_url = console.input("[bold]Upload URL:[/bold] ").strip()
+
+            name = (name or "").strip()
+            server = (server or "").strip()
+            download_url = (download_url or "").strip()
+            upload_url = (upload_url or "").strip()
+
+            if not name:
+                console.print("[red]Preset name is required[/red]")
+                continue
+            if name in PRESETS:
+                console.print(f"[red]'{name}' is a built-in preset and cannot be overwritten[/red]")
+                continue
+            if not server or not download_url or not upload_url:
+                console.print("[red]Server, download URL, and upload URL are required[/red]")
+                continue
+
+            add_custom_preset(name, server, download_url, upload_url)
+            console.print(f"[green]Preset '{name}' added[/green]")
+
+            use_now = console.input("[bold]Use it now? [y/N]:[/bold] ").strip().lower()
+            if use_now in ("y", "yes"):
+                args.preset = name
+                resolve_args(args)
+                set_saved_preset(name)
+                console.print(f"[green]Preset set to '{name}'[/green]")
         elif cmd.startswith("/preset "):
             name = cmd[len("/preset "):].strip()
-            if name in PRESETS:
+            all_presets = _all_presets()
+            if name in all_presets:
                 args.preset = name
                 resolve_args(args)
                 set_saved_preset(name)
@@ -356,6 +406,29 @@ async def _interactive_session(
             console.print(f"  Current server: {args.server}")
         else:
             console.print(f"[yellow]Unknown command: {cmd}[/yellow]")
+
+
+def _parse_preset_add_args(rest_argv: list[str]) -> tuple[str | None, str | None, str | None, str | None]:
+    if not rest_argv:
+        return None, None, None, None
+    name = rest_argv[0]
+    server = None
+    download_url = None
+    upload_url = None
+    i = 1
+    while i < len(rest_argv):
+        if rest_argv[i] == "--server" and i + 1 < len(rest_argv):
+            server = rest_argv[i + 1]
+            i += 2
+        elif rest_argv[i] == "--download-url" and i + 1 < len(rest_argv):
+            download_url = rest_argv[i + 1]
+            i += 2
+        elif rest_argv[i] == "--upload-url" and i + 1 < len(rest_argv):
+            upload_url = rest_argv[i + 1]
+            i += 2
+        else:
+            i += 1
+    return name, server, download_url, upload_url
 
 
 async def async_main(argv: Sequence[str] | None = None) -> int:
@@ -370,6 +443,16 @@ async def async_main(argv: Sequence[str] | None = None) -> int:
     if cmd == "update":
         dry_run = "--dry-run" in rest_argv
         return _run_update(dry_run=dry_run)
+    if cmd == "preset" and len(rest_argv) >= 1 and rest_argv[0] == "add":
+        name, server, download_url, upload_url = _parse_preset_add_args(rest_argv[1:])
+        if not name or not name.strip():
+            return 1
+        if name in PRESETS:
+            return 1
+        if not server or not download_url or not upload_url:
+            return 1
+        add_custom_preset(name, server, download_url, upload_url)
+        return 0
 
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -383,7 +466,8 @@ async def async_main(argv: Sequence[str] | None = None) -> int:
     resolve_preset(args)
 
     if args.list_presets:
-        for name, urls in PRESETS.items():
+        all_presets = _all_presets()
+        for name, urls in all_presets.items():
             marker = " (active)" if args.preset == name else ""
             print(f"{name}{marker}  →  {urls['server']}")
         return 0
