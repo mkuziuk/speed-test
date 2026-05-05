@@ -169,13 +169,31 @@ class SpeedTestDisplay:
         max_speed = 200.0
         filled = min(speed_mbps / max_speed, 1.0)
         filled_chars = int(filled * width)
+        # Ensure any positive speed shows at least one filled block
+        if speed_mbps > 0 and filled_chars == 0:
+            filled_chars = 1
         empty_chars = width - filled_chars
-        bar = "█" * filled_chars + "░" * empty_chars
-        if speed_mbps < 25:
-            return f"[red]{bar}[/red]"
-        if speed_mbps < 100:
-            return f"[yellow]{bar}[/yellow]"
-        return f"[bright_green]{bar}[/bright_green]"
+
+        # Dark green (#008000) to spring-green (#00ff80) gradient via hex interpolation
+        start_color = (0, 128, 0)    # dark green
+        end_color = (0, 255, 128)    # spring green (green with hint of cyan)
+
+        # Build gauge with gradient based on absolute position
+        gauge = ""
+        for i in range(width):
+            if i < filled_chars:
+                # Compute t based on absolute position in full width
+                t = i / (width - 1) if width > 1 else 0.0
+                # Interpolate RGB channels
+                r = int(start_color[0] + (end_color[0] - start_color[0]) * t)
+                g = int(start_color[1] + (end_color[1] - start_color[1]) * t)
+                b = int(start_color[2] + (end_color[2] - start_color[2]) * t)
+                hex_color = f"#{r:02x}{g:02x}{b:02x}"
+                gauge += f"[{hex_color}]█[/{hex_color}]"
+            else:
+                gauge += "[dim]░[/dim]"
+
+        return gauge
 
     @staticmethod
     def _format_bytes(bytes_count: int) -> str:
